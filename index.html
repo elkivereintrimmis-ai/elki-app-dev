@@ -830,7 +830,8 @@
              onAuthStateChanged, createUserWithEmailAndPassword,
              deleteUser as fbDeleteAuthUser, updatePassword,
              sendPasswordResetEmail, verifyBeforeUpdateEmail,
-             EmailAuthProvider, reauthenticateWithCredential }
+             EmailAuthProvider, reauthenticateWithCredential,
+             setPersistence, inMemoryPersistence }
       from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
     import { getFirestore, doc, getDoc, setDoc, collection, getDocs, deleteDoc }
       from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
@@ -845,15 +846,48 @@
         appId:             "1:336282417580:web:aff3d7b67e125e12296209"
     };
 
-    // Haupt-App (bleibt eingeloggt als Admin)
+    // Haupt-App
     const app  = initializeApp(firebaseConfig, 'main');
     const auth = getAuth(app);
     const db   = getFirestore(app);
+
+    // GEAENDERT 2026-08-20: Anmeldung NICHT mehr im Browser speichern.
+    //
+    // Vorher galt die Firebase-Voreinstellung (browserLocalPersistence):
+    // die Sitzung lag in IndexedDB und ueberlebte sogar einen Neustart des
+    // Browsers - wer die Seite oeffnete, war sofort drin. Auf einem
+    // geteilten Geraet heisst das: der Naechste arbeitet als der Vorherige.
+    //
+    // inMemoryPersistence haelt die Sitzung nur im Arbeitsspeicher der
+    // Seite. Jedes Neuladen und jeder neue Tab verlangen eine neue
+    // Anmeldung. Bewusst NICHT browserSessionPersistence - die ueberlebt
+    // ein Neuladen im selben Tab, was hier gerade nicht gewollt ist.
+    //
+    // Muss VOR dem ersten onAuthStateChanged stehen, sonst kaeme eine alte
+    // gespeicherte Sitzung noch einmal durch. Top-Level-await ist in einem
+    // <script type="module"> erlaubt und verzoegert nur dieses Modul - die
+    // App startet ohnehin erst ueber _fbReady().
+    try {
+      await setPersistence(auth, inMemoryPersistence);
+    } catch (e) {
+      // Nicht die App blockieren, aber sichtbar machen: hier bliebe die
+      // Anmeldung sonst gespeichert.
+      console.error('setPersistence fehlgeschlagen - Anmeldung koennte gespeichert bleiben:', e);
+    }
 
     // Zweite App-Instanz nur zum Anlegen neuer User
     // → eigene Auth-Session, unterbricht Admin-Login nicht
     const appHelper = initializeApp(firebaseConfig, 'helper');
     const authHelper = getAuth(appHelper);
+
+    // Auch hier nichts speichern: createUserWithEmailAndPassword meldet den
+    // neu angelegten Benutzer automatisch an. Ohne das hier landete
+    // ausgerechnet dessen Sitzung im Browser-Speicher.
+    try {
+      await setPersistence(authHelper, inMemoryPersistence);
+    } catch (e) {
+      console.error('setPersistence (helper) fehlgeschlagen:', e);
+    }
 
     // ── Firestore-Hilfsfunktionen ────────────────────────────
     async function fbLoad(docPath, fallback) {
