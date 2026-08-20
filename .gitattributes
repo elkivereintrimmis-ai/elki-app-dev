@@ -1,0 +1,9 @@
+# Zeilenenden NIE umschreiben.
+#
+# Die Live-Fassung in elki-app liegt durchgehend mit CRLF im Repo. Wuerde
+# Git hier normalisieren (core.autocrlf=true ist auf diesem Rechner gesetzt),
+# laege im Dev-Repo LF - und jeder Vergleich Dev <-> Live zeigte dann jede
+# Zeile als geaendert, statt nur die echten Aenderungen.
+#
+# Darum: byte-genau ablegen, so wie die Datei in der Arbeitskopie steht.
+* -text
